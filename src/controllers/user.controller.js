@@ -1,6 +1,7 @@
 const catchError = require('../utils/catchError');
 const User = require('../models/User');
 const { verifyAccount } = require('../utils/verifyAccount');
+const EmailCode = require('../models/EmailCode');
 
 const getAll = catchError(async (req, res) => {
   const results = await User.findAll();
@@ -15,6 +16,8 @@ const create = catchError(async (req, res) => {
   const code = require("crypto").randomBytes(64).toString("hex")
 
   verifyAccount(email, firstName, frontBaseUrl, code)
+
+  await EmailCode.create({ code, userId: result.id })
 
   return res.status(201).json(result);
 });
@@ -46,10 +49,33 @@ const update = catchError(async (req, res) => {
   return res.json(result[1][0]);
 });
 
+const verifyUser = catchError(async (req, res) => { // ---- users/verify/:code
+
+  const { code } = req.params
+
+  const emailCode = await EmailCode.findOne({ where: { code } })
+
+  if (!emailCode) return res.sendStatus(401)
+
+  const user = await User.update(
+    { isVerified: true },
+    { where: { id: emailCode.userId }, returning: true }
+  )
+
+  if (user[0] === 0) return res.sendStatus(404);
+
+  await emailCode.destroy()
+
+  return res.json(user[1][0])
+
+
+})
+
 module.exports = {
   getAll,
   create,
   getOne,
   remove,
-  update
+  update,
+  verifyUser
 }
