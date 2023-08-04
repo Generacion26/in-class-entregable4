@@ -1,5 +1,6 @@
 const catchError = require('../utils/catchError');
 const User = require('../models/User');
+const { verifyAccount } = require('../utils/verifyAccount');
 
 const getAll = catchError(async (req, res) => {
   const results = await User.findAll();
@@ -7,7 +8,14 @@ const getAll = catchError(async (req, res) => {
 });
 
 const create = catchError(async (req, res) => {
+  const { email, firstName, frontBaseUrl } = req.body
+
   const result = await User.create(req.body);
+
+  const code = require("crypto").randomBytes(64).toString("hex")
+
+  verifyAccount(email, firstName, frontBaseUrl, code)
+
   return res.status(201).json(result);
 });
 
