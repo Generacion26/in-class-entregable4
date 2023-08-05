@@ -3,7 +3,8 @@ const User = require('../models/User');
 const { verifyAccount } = require('../utils/verifyAccount');
 const EmailCode = require('../models/EmailCode');
 const bcrypt = require("bcrypt")
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const { sendEmailResetPassword } = require('../utils/sendEmailResetPassword');
 
 const getAll = catchError(async (req, res) => {
   const results = await User.findAll();
@@ -95,7 +96,35 @@ const logged = catchError(async (req, res) => {
   return res.json(user)
 })
 
+const resetPassword = catchError(async (req, res) => {
+  const { email, frontBaseUrl } = req.body
+  const user = await User.findOne({ where: { email } })
+  if (!user) return res.sendStatus(401)
+  const code = require("crypto").randomBytes(64).toString("hex")
+  sendEmailResetPassword(email, user.firstName, frontBaseUrl, code)
+  await EmailCode.create({ code, userId: user.id })
+  return res.json(user)
+})
 
+
+const updatePasword = catchError(async (req, res) => {
+  const { code } = req.params
+
+  const emailCode = await EmailCode.findOne({ where: { code } })
+  if (!emailCode) return res.sendStatus(401)
+
+  const hashPassword = await bcrypt.hash(req.body.password, 10)
+
+  const user = await User.update(
+    { password: hashPassword },
+    { where: { id: emailCode.userId }, returning: true }
+  )
+  if (user[0] === 0) return res.sendStatus(404);
+
+  await emailCode.destroy()
+  return res.json(user[1][0])
+
+})
 
 module.exports = {
   getAll,
@@ -105,5 +134,7 @@ module.exports = {
   update,
   verifyUser,
   login,
-  logged
+  logged,
+  resetPassword,
+  updatePasword
 }
