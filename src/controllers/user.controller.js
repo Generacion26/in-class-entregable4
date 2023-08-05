@@ -2,6 +2,8 @@ const catchError = require('../utils/catchError');
 const User = require('../models/User');
 const { verifyAccount } = require('../utils/verifyAccount');
 const EmailCode = require('../models/EmailCode');
+const bcrypt = require("bcrypt")
+const jwt = require('jsonwebtoken')
 
 const getAll = catchError(async (req, res) => {
   const results = await User.findAll();
@@ -71,11 +73,37 @@ const verifyUser = catchError(async (req, res) => { // ---- users/verify/:code
 
 })
 
+const login = catchError(async (req, res) => {
+  const { email, password } = req.body
+  const user = await User.findOne({ where: { email } })
+  if (!user) return res.sendStatus(401)
+  if (!user.isVerified) return res.sendStatus(401)
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) return res.sendStatus(401)
+
+  const token = jwt.sign(
+    { user },
+    process.env.TOKEN_SECRET,
+    { expiresIn: "1d" }
+  )
+
+  return res.json({ user, token })
+})
+
+const logged = catchError(async (req, res) => {
+  const user = req.user
+  return res.json(user)
+})
+
+
+
 module.exports = {
   getAll,
   create,
   getOne,
   remove,
   update,
-  verifyUser
+  verifyUser,
+  login,
+  logged
 }
